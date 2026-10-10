@@ -179,15 +179,16 @@ void main() {
     expect(find.text('numpy 2.0.0'), findsOneWidget);
     expect(find.text('https://numpy.org'), findsOneWidget);
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
-    await tester.pump();
+    // Everything is on one page: dependencies, patches and files together.
+    expect(find.text('python >=3.12'), findsOneWidget);
+    expect(find.text('Patches'), findsOneWidget);
+    expect(find.textContaining('libgcc'), findsWidgets);
     expect(find.text('bin/f2py'), findsOneWidget);
 
-    expect(find.text('5 Patches (1)'), findsOneWidget);
-    await tester.sendKeyEvent(LogicalKeyboardKey.digit5);
+    // Number keys fold sections away.
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit2);
     await tester.pump();
-    expect(find.textContaining('libgcc'), findsWidgets);
-
+    expect(find.text('python >=3.12'), findsNothing);
     await tester.sendKeyEvent(LogicalKeyboardKey.digit2);
     await tester.pump();
     expect(find.text('python >=3.12'), findsOneWidget);

@@ -10,7 +10,8 @@ import 'search.dart';
 
 enum Pane { packages, versions, details }
 
-enum DetailTab { metadata, dependencies, files, about, patches }
+/// The collapsible sections of the artifact view, in on-screen order.
+enum DetailSection { metadata, dependencies, about, patches, files }
 
 /// A row of the version list: either a collapsible subdir header or one
 /// artifact.
@@ -77,7 +78,8 @@ class BrowserState extends ChangeNotifier {
   int versionIndex = 0;
 
   PackageRecord? selectedRecord;
-  DetailTab detailTab = DetailTab.metadata;
+  /// Sections the user folded away; kept while moving between artifacts.
+  final Set<DetailSection> collapsedSections = {};
   ArtifactContents? contents;
   bool loadingContents = false;
   String? contentsError;
@@ -399,8 +401,8 @@ class BrowserState extends ChangeNotifier {
     }
   }
 
-  void setDetailTab(DetailTab tab) {
-    detailTab = tab;
+  void toggleSection(DetailSection section) {
+    if (!collapsedSections.remove(section)) collapsedSections.add(section);
     notifyListeners();
   }
 

@@ -197,7 +197,7 @@ const List<(String, String)> keybindings = [
   ('r', 'Refresh channel data, skipping the cache'),
   ('d', 'Download the selected artifact'),
   ('y', 'Copy the package or artifact as JSON'),
-  ('1 – 5', 'Switch detail tab'),
+  ('1 – 5', 'Fold or unfold a detail section'),
   ('?', 'Show this help'),
 ];
 

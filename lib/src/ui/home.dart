@@ -217,7 +217,7 @@ class _HomePageState extends State<HomePage> {
     } else if (char != null &&
         state.selectedRecord != null &&
         RegExp(r'^[1-5]$').hasMatch(char)) {
-      state.setDetailTab(DetailTab.values[int.parse(char) - 1]);
+      state.toggleSection(DetailSection.values[int.parse(char) - 1]);
     } else {
       return false;
     }
