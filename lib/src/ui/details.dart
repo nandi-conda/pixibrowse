@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../conda/artifact.dart';
 import '../conda/models.dart';
+import '../conda/prefix.dart';
 import '../conda/repodata.dart';
 import '../search.dart';
 import '../state.dart';
@@ -344,19 +345,30 @@ class PackageInfoView extends StatelessWidget {
       if (info != null && info.keywords.isNotEmpty)
         ('Keywords', text(info.keywords)),
     ];
+    // The channels this package came from, so the note blames the right one.
+    final sources = records.isEmpty
+        ? state.channels
+        : [for (final c in {for (final r in records) r.channel}) c];
+    final served = sources.where(state.channelsWithChannelData.contains);
+    const fallback = 'showing the newest artifact\'s record.';
     final String? note;
     if (info != null) {
       note = null;
+    } else if (state.lookingUp(name)) {
+      note = 'Looking up the summary on prefix.dev…';
     } else if (state.loadingChannelData) {
       note = 'Loading the summary from channeldata.json…';
-    } else if (state.channelInfo.isEmpty) {
-      note =
-          'This channel serves no channeldata.json; showing the newest '
-          'artifact\'s record.';
+    } else if (state.prefixDevError != null) {
+      note = 'Could not look up $name on prefix.dev '
+          '(${state.prefixDevError}); $fallback';
+    } else if (served.isEmpty) {
+      final onPrefixDev = sources.any((c) => prefixDevChannelName(c) != null);
+      note = '${sources.join(', ')} '
+          '${sources.length == 1 ? 'serves' : 'serve'} no channeldata.json'
+          '${onPrefixDev ? ' and prefix.dev has no summary for $name' : ''}'
+          '; $fallback';
     } else {
-      note =
-          'channeldata.json has no entry for $name; showing the newest '
-          'artifact\'s record.';
+      note = 'channeldata.json has no entry for $name; $fallback';
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

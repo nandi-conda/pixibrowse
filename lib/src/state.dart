@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'conda/artifact.dart';
 import 'conda/channeldata.dart';
 import 'conda/models.dart';
+import 'conda/prefix.dart';
 import 'conda/repodata.dart';
 import 'search.dart';
 
@@ -64,6 +65,18 @@ class BrowserState extends ChangeNotifier {
   bool loadingChannelData = false;
   String? channelDataError;
 
+  /// The channels that served a `channeldata.json`.
+  Set<String> channelsWithChannelData = const {};
+
+  /// Summaries looked up one package at a time from prefix.dev, whose
+  /// channels have no channeldata.
+  final Map<String, ChannelPackage> _prefixDevInfo = {};
+  final Set<String> _prefixDevLookups = {};
+  String? prefixDevError;
+
+  /// Whether prefix.dev is still being asked about [name].
+  bool lookingUp(String name) => _prefixDevLookups.contains(name);
+
   /// Whether the package search also looks at summaries and descriptions.
   bool searchSummaries = true;
   int packageIndex = 0;
@@ -102,7 +115,11 @@ class BrowserState extends ChangeNotifier {
     _clearPackage();
     notifyListeners();
     channelInfo = const {};
+    channelsWithChannelData = const {};
     channelDataError = null;
+    _prefixDevInfo.clear();
+    _prefixDevLookups.clear();
+    prefixDevError = null;
     try {
       final platforms = await client.discoverPlatforms(
         channels,
@@ -167,11 +184,13 @@ class BrowserState extends ChangeNotifier {
     loadingChannelData = true;
     notifyListeners();
     final merged = <String, ChannelPackage>{};
+    final served = <String>{};
     final errors = <String>[];
     for (final channel in channels) {
       try {
         final info = await client.channelData(channel);
         if (generation != _generation) return;
+        if (info.isNotEmpty) served.add(channel);
         for (final entry in info.entries) {
           merged.putIfAbsent(entry.key, () => entry.value);
         }
@@ -181,14 +200,52 @@ class BrowserState extends ChangeNotifier {
     }
     if (generation != _generation) return;
     channelInfo = merged;
+    channelsWithChannelData = served;
     channelDataError = errors.isEmpty ? null : errors.join('\n');
     loadingChannelData = false;
     if (packageQuery.trim().isNotEmpty) _applyPackageFilter(keepSelection: true);
     notifyListeners();
   }
 
-  /// What the channel says about [name], if it serves channeldata.
-  ChannelPackage? infoFor(String name) => channelInfo[name];
+  /// What the channel says about [name], from its channeldata or, on
+  /// prefix.dev, its GraphQL API.
+  ChannelPackage? infoFor(String name) =>
+      channelInfo[name] ?? _prefixDevInfo[name];
+
+  /// Asks prefix.dev about [name] when a channel is hosted there and no
+  /// channeldata has an entry for it, trying channels in order.
+  Future<void> _lookUpPrefixDev(String name) async {
+    final hosted = [
+      for (final channel in channels)
+        if (prefixDevChannelName(channel) != null) channel,
+    ];
+    if (hosted.isEmpty ||
+        channelInfo.containsKey(name) ||
+        _prefixDevInfo.containsKey(name) ||
+        !_prefixDevLookups.add(name)) {
+      return;
+    }
+    final generation = _generation;
+    prefixDevError = null;
+    notifyListeners();
+    try {
+      for (final channel in hosted) {
+        final info = await fetchPrefixDevPackage(client.client, channel, name);
+        if (generation != _generation) return;
+        if (info != null) {
+          _prefixDevInfo[name] = info;
+          break;
+        }
+      }
+    } catch (e) {
+      if (generation == _generation) prefixDevError = '$e';
+    } finally {
+      if (generation == _generation) {
+        _prefixDevLookups.remove(name);
+        notifyListeners();
+      }
+    }
+  }
 
   /// Downloads everything again, ignoring what is cached, and keeps the
   /// current platform selection.
@@ -292,6 +349,7 @@ class BrowserState extends ChangeNotifier {
     _clearRecord();
     focusedPane = Pane.versions;
     notifyListeners();
+    unawaited(_lookUpPrefixDev(name));
     try {
       final result =
           await client.records(name, channels, selectedPlatforms);
