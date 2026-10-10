@@ -322,6 +322,7 @@ class PackageInfoView extends StatelessWidget {
         'Install',
         InstallCommands(
           name,
+          latest: info?.version ?? newest?.version,
           channel: newest?.channel ??
               info?.channel ??
               (state.packageChannels.isEmpty

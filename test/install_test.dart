@@ -7,12 +7,20 @@ import 'package:pixibrowse/src/install/pixi_runner.dart';
 import 'package:pixibrowse/src/ui/install.dart';
 
 class FakeRunner implements PixiRunner {
-  FakeRunner({this.found = true});
+  FakeRunner({this.found = true, this.installed = const {}});
   final bool found;
+  Map<String, GlobalPackage> installed;
+  int lists = 0;
   final args = <List<String>>[];
   final output = StreamController<String>();
   final exit = Completer<int>();
   bool killed = false;
+
+  @override
+  Future<Map<String, GlobalPackage>?> globalPackages() async {
+    lists++;
+    return found ? installed : null;
+  }
 
   @override
   Future<PixiRun> start(List<String> args) async {
@@ -28,6 +36,7 @@ class FakeRunner implements PixiRunner {
 
 Future<void> pumpCommands(WidgetTester tester, PixiRunner? runner) async {
   PixiRunner.instance = runner;
+  InstalledPackages.instance = InstalledPackages();
   await tester.pumpWidget(MaterialApp(
     theme: KitTheme.material(KitColors.light),
     home: const Material(
@@ -38,6 +47,7 @@ Future<void> pumpCommands(WidgetTester tester, PixiRunner? runner) async {
       ),
     ),
   ));
+  await tester.pump();
 }
 
 void main() {
@@ -84,6 +94,54 @@ void main() {
     );
   });
 
+  test('reads pixi global list, preferring the eponymous environment', () {
+    final packages = parseGlobalList('''[
+      {"name": "tools", "dependencies": [{"name": "jq", "version": "1.7"}]},
+      {"name": "jq", "dependencies": [{"name": "jq", "version": "1.8.2"}],
+       "exposed": [{"exposed_name": "jq", "executable": "jq"}]},
+      {"name": "broken"}
+    ]''');
+    expect(packages.keys, ['jq']);
+    expect(packages['jq']!.version, '1.8.2');
+    expect(packages['jq']!.environment, 'jq');
+  });
+
+  test('status compares the installed version', () {
+    GlobalStatus of(String? have, {String? version, String? latest}) =>
+        GlobalStatus.of(
+          'jq',
+          installed: have == null ? null : GlobalPackage('jq', have, 'jq'),
+          version: version,
+          latest: latest,
+        );
+    var s = of(null, latest: '1.8');
+    expect([s.label, s.kind, s.action, s.args], [
+      'Not installed',
+      GlobalStatusKind.missing,
+      'Install',
+      ['global', 'install', 'jq'],
+    ]);
+    s = of('1.8', latest: '1.8');
+    expect([s.label, s.action, s.args], [
+      'Installed 1.8',
+      'Reinstall',
+      ['global', 'install', 'jq', '--force-reinstall'],
+    ]);
+    s = of('1.7', latest: '1.10');
+    expect([s.label, s.kind, s.action, s.args], [
+      'Update available: 1.7 → 1.10',
+      GlobalStatusKind.outdated,
+      'Update to 1.10',
+      ['global', 'install', 'jq'],
+    ]);
+    s = of('1.8', version: '1.7', latest: '1.8');
+    expect([s.label, s.action, s.args], [
+      'Installed 1.8',
+      'Install 1.7 instead',
+      ['global', 'install', 'jq==1.7'],
+    ]);
+  });
+
   test('terminal output is split into clean lines', () {
     expect(
       terminalLines('\x1B[32m✔\x1B[0m one\r\ntwo\rthree\n\n'),
@@ -128,7 +186,27 @@ void main() {
     expect(find.text('Install zumba'), findsNothing);
     expect(find.text('Installed zumba with pixi global'), findsOneWidget);
     expect(runner.killed, isFalse);
+    expect(runner.lists, 2);
     await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('shows the installed version and offers a reinstall',
+      (tester) async {
+    final runner = FakeRunner(
+      installed: {'zumba': const GlobalPackage('zumba', '1.0.0', 'zumba')},
+    );
+    await pumpCommands(tester, runner);
+    expect(find.text('pixi global: Installed 1.0.0'), findsOneWidget);
+    expect(find.byIcon(Icons.play_arrow), findsNothing);
+    await tester.tap(find.byIcon(Icons.refresh));
+    await tester.pump();
+    expect(runner.args.single.last, '--force-reinstall');
+  });
+
+  testWidgets('no status when pixi is missing', (tester) async {
+    await pumpCommands(tester, FakeRunner(found: false));
+    expect(find.textContaining('pixi global:'), findsNothing);
+    expect(find.byIcon(Icons.play_arrow), findsOneWidget);
   });
 
   testWidgets('cancelling stops pixi', (tester) async {

@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:pixibrowse/main.dart';
 import 'package:pixibrowse/src/conda/repodata.dart';
+import 'package:pixibrowse/src/install/pixi_runner.dart';
 import 'package:pixibrowse/src/state.dart';
 
 import 'helpers.dart';
@@ -156,6 +157,9 @@ Future<void> settle(WidgetTester tester, bool Function() busy) async {
 }
 
 void main() {
+  // Never run the real pixi from tests.
+  setUp(() => PixiRunner.instance = null);
+
   testWidgets('browses packages, versions, metadata and files', (tester) async {
     final state = await pumpApp(tester);
     expect(state.error, isNull);
