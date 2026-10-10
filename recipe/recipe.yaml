@@ -1,0 +1,50 @@
+# Built by pixi-build (pixi-build-rattler-build); run `pixi run package`.
+context:
+  name: pixibrowse
+  version: "1.0.0"
+  app_id: dev.codegod.pixibrowse
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+build:
+  number: 0
+  script: build.sh
+
+requirements:
+  build:
+    - patchelf
+    - flutter-sdk
+    - cmake
+    - ninja
+    - pkg-config
+    - clangxx
+  host:
+    - gtk3
+    # .pc files that gtk3's Requires(.private) chain needs; conda splits them from lib* runtime pkgs
+    - zlib
+    - expat
+    - libpng
+    - freetype
+    - libffi
+    - pcre2
+    - bzip2
+    - glib >=2.90.0,<3
+  run:
+    - gtk3
+    - glib >=2.90.0,<3
+
+tests:
+  - package_contents:
+      bin:
+        - pixibrowse
+      files:
+        - share/applications/${{ app_id }}.desktop
+        - share/icons/hicolor/scalable/apps/${{ app_id }}.svg
+
+about:
+  summary: Desktop browser for conda channels, built on flatkit
+  homepage: https://github.com/nandi-conda/pixibrowse
+  license: BSD-3-Clause
+  license_file: LICENSE

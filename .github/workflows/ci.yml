@@ -19,6 +19,36 @@ jobs:
       - run: flutter test
       - run: flutter build web --release --no-web-resources-cdn
 
+  package:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # prefix.dev trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: prefix-dev/setup-pixi@5185adfbffb4bd703da3010310260805d89ebb11 # v0.9.6
+      - run: pixi run package
+      - name: Publish to prefix.dev/nandi-testing
+        # The publish secret lives on the nandi-conda org; forks and the old home only build.
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'nandi-conda'
+        run: |
+          # An empty PREFIX_API_KEY is sent as a (bad) key; unset it to fall back to OIDC.
+          [ -n "$PREFIX_API_KEY" ] || unset PREFIX_API_KEY
+          # Skips files already on the channel; bump the version or build number to publish a new build.
+          pixi exec rattler-build upload prefix -c nandi-testing --skip-existing $(find output -name "*.conda")
+          # Copy the conda-forge runtime dependencies too, so the channel installs on its own.
+          ci/fetch-deps.sh nandi-testing deps output
+          if [ -n "$(ls deps)" ]; then pixi exec rattler-build upload prefix -c nandi-testing --skip-existing deps/*; fi
+        shell: bash
+        env:
+          # Optional; if unset, rattler-build uses trusted publishing (OIDC).
+          PREFIX_API_KEY: ${{ secrets.PREFIX_API_KEY }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: conda-packages
+          path: output/**/*.conda
+
   appimage:
     needs: test
     runs-on: ubuntu-22.04

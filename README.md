@@ -47,6 +47,19 @@ Package summaries, summary search and the disk cache come from
 - **Vim-style keyboard navigation**, as in the TUI.
 - **No animations** on dialogs, menus, tabs or page changes.
 
+## Install
+
+On Linux, install it with pixi from the nandi-testing channel on prefix.dev,
+which also carries the conda-forge packages it needs:
+
+```bash
+pixi global install -c https://prefix.dev/nandi-testing pixibrowse
+```
+
+Or grab the AppImage from the rolling
+[latest release](https://github.com/nandi-conda/pixibrowse/releases/tag/latest),
+`chmod +x` it and run it; it can update itself with AppImageUpdate.
+
 ## Running
 
 ```bash

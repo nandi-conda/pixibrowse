@@ -1,0 +1,30 @@
+[workspace]
+preview = ["pixi-build"]
+name = "pixibrowse"
+channels = ["conda-forge", "https://prefix.dev/hadron"]
+platforms = ["linux-64"]
+
+[dependencies]
+flutter-sdk = "*"  # from the hadron channel
+patchelf = "*"
+cmake = "*"
+ninja = "*"
+pkg-config = "*"
+clangxx = "*"
+gtk3 = "*"
+glib = ">=2.90.0,<3"
+
+[package]
+name = "pixibrowse"
+version = "1.0.0"
+
+# Built from source by recipe/recipe.yaml.
+[package.build]
+backend = { name = "pixi-build-rattler-build", version = "*" }
+
+[tasks]
+deps = "flutter pub get"
+run = { cmd = "flutter run -d linux", depends-on = ["deps"] }
+test = { cmd = "flutter test", depends-on = ["deps"] }
+build = { cmd = "flutter build linux --release", depends-on = ["deps"] }
+package = "pixi build --output-dir output"
