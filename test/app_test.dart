@@ -232,7 +232,7 @@ void main() {
     expect(find.text('Select all'), findsNothing);
     expect(find.text('Select none'), findsNothing);
 
-    await tester.tap(find.byIcon(Icons.keyboard_outlined));
+    await tester.sendKeyEvent(LogicalKeyboardKey.slash, character: '?');
     await tester.pump();
     expect(find.text('Keyboard shortcuts'), findsOneWidget);
     expect(tester.hasRunningAnimations, isFalse);

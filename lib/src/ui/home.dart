@@ -1,5 +1,4 @@
 import 'package:flatkit/flatkit.dart';
-import 'package:flutter/material.dart' show Icons;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -237,12 +236,6 @@ class _HomePageState extends State<HomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Toolbar(
-          state: state,
-          onChannels: _editChannels,
-          onPlatforms: _editPlatforms,
-          onRefresh: _refresh,
-        ),
         // A static bar rather than a looping spinner.
         SizedBox(height: 2, child: busy ? ColoredBox(color: c.accent) : null),
         Expanded(
@@ -260,6 +253,8 @@ class _HomePageState extends State<HomePage> {
     state: state,
     searchController: _packageSearch,
     searchFocus: _packageSearchFocus,
+    onChannels: _editChannels,
+    onPlatforms: _editPlatforms,
   );
 
   Widget _versionsPane({bool showBack = false}) => VersionsPane(
@@ -289,86 +284,6 @@ class _HomePageState extends State<HomePage> {
     }
     if (state.selectedPackage != null) return _versionsPane(showBack: true);
     return _packagesPane();
-  }
-}
-
-class _Toolbar extends StatelessWidget {
-  const _Toolbar({
-    required this.state,
-    required this.onChannels,
-    required this.onPlatforms,
-    required this.onRefresh,
-  });
-
-  final BrowserState state;
-  final VoidCallback onChannels;
-  final VoidCallback onPlatforms;
-  final VoidCallback onRefresh;
-
-  String get _platformLabel {
-    if (state.availablePlatforms.isEmpty) return 'Platforms';
-    if (state.selectedPlatforms.length == state.availablePlatforms.length) {
-      return 'All platforms';
-    }
-    return state.selectedPlatforms.length <= 2
-        ? state.selectedPlatforms.join(', ')
-        : '${state.selectedPlatforms.length} platforms';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = KitTheme.of(context);
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: c.surface,
-        border: Border(bottom: BorderSide(color: c.border)),
-      ),
-      child: Row(
-        children: [
-          Text(
-            'pixibrowse',
-            style: mono(context, size: 16, weight: FontWeight.bold),
-          ),
-          const Spacer(),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 260),
-            child: KitButton.ghost(
-              // The packages pane's checkbox already says when every
-              // channel is being searched, so this only names the picker.
-              state.searchAllChannels
-                  ? 'Channels'
-                  : state.channels.join(', '),
-              icon: Icons.hub_outlined,
-              tooltip: 'Channels  ( c )',
-              onPressed: onChannels,
-            ),
-          ),
-          const SizedBox(width: 4),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 220),
-            child: KitButton.ghost(
-              _platformLabel,
-              icon: Icons.memory,
-              tooltip: 'Platforms  ( p )',
-              onPressed: onPlatforms,
-            ),
-          ),
-          const SizedBox(width: 4),
-          KitIconButton(
-            Icons.refresh,
-            tooltip: 'Refresh, skipping the cache  ( r )',
-            onPressed: state.loadingChannels ? null : onRefresh,
-          ),
-          KitIconButton(
-            Icons.keyboard_outlined,
-            tooltip: 'Keyboard shortcuts  ( ? )',
-            onPressed: () => showHelpDialog(context),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -416,7 +331,7 @@ class _StatusBar extends StatelessWidget {
           ),
           Flexible(
             child: Text(
-              '/ search · j/k move · Enter open · Esc back · r refresh · ? help',
+              '/ search · j/k move · Enter open · Esc back · c channels · p platforms · r refresh · ? help',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: dim(context),

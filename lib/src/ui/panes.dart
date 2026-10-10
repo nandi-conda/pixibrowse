@@ -174,11 +174,23 @@ class PackagesPane extends StatelessWidget {
     required this.state,
     required this.searchController,
     required this.searchFocus,
+    required this.onChannels,
+    required this.onPlatforms,
   });
 
   final BrowserState state;
   final TextEditingController searchController;
   final FocusNode searchFocus;
+  final VoidCallback onChannels;
+  final VoidCallback onPlatforms;
+
+  String _platformLabel() {
+    if (state.availablePlatforms.isEmpty) return 'none loaded';
+    if (state.selectedPlatforms.length == state.availablePlatforms.length) {
+      return 'all';
+    }
+    return state.selectedPlatforms.join(', ');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -342,17 +354,38 @@ class PackagesPane extends StatelessWidget {
             const SizedBox(width: 4),
           ],
         ),
-        SearchField(
-          controller: searchController,
-          focusNode: searchFocus,
-          hint: all ? 'Search all channels  ( / )' : 'Search packages  ( / )',
-          onChanged: state.setPackageQuery,
-          onSubmitted: () {
-            if (state.packages.isNotEmpty) {
-              searchFocus.unfocus();
-              state.openPackage(state.packages[state.packageIndex]);
-            }
-          },
+        Row(
+          children: [
+            Expanded(
+              child: SearchField(
+                controller: searchController,
+                focusNode: searchFocus,
+                hint: all
+                    ? 'Search all channels  ( / )'
+                    : 'Search packages  ( / )',
+                onChanged: state.setPackageQuery,
+                onSubmitted: () {
+                  if (state.packages.isNotEmpty) {
+                    searchFocus.unfocus();
+                    state.openPackage(state.packages[state.packageIndex]);
+                  }
+                },
+              ),
+            ),
+            KitIconButton(
+              Icons.hub_outlined,
+              tooltip: all
+                  ? 'Channels  ( c )'
+                  : 'Channels: ${state.channels.join(', ')}  ( c )',
+              onPressed: onChannels,
+            ),
+            KitIconButton(
+              Icons.memory,
+              tooltip: 'Platforms: ${_platformLabel()}  ( p )',
+              onPressed: state.availablePlatforms.isEmpty ? null : onPlatforms,
+            ),
+            const SizedBox(width: 4),
+          ],
         ),
         Expanded(child: body),
       ],
