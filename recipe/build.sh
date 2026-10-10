@@ -25,3 +25,7 @@ ln -sf ../lib/pixibrowse/pixibrowse "$PREFIX/bin/pixibrowse"
 install -Dm644 linux/$id.desktop "$PREFIX/share/applications/$id.desktop"
 install -Dm644 linux/$id.svg "$PREFIX/share/icons/hicolor/scalable/apps/$id.svg"
 install -Dm644 linux/runner/resources/pixibrowse.png "$PREFIX/share/icons/hicolor/256x256/apps/$id.png"
+
+# menuinst: `pixi global install` reads Menu/*.json to add a desktop launcher with this icon.
+install -Dm644 "$RECIPE_DIR/menu.json" "$PREFIX/Menu/pixibrowse.json"
+install -Dm644 linux/runner/resources/pixibrowse.png "$PREFIX/Menu/pixibrowse.png"

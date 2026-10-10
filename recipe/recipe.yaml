@@ -9,9 +9,10 @@ package:
   version: ${{ version }}
 
 build:
-  # Every CI run publishes a fresh build: GitHub sets GITHUB_RUN_NUMBER, which is
-  # already past the hand-bumped build 1. Local builds fall back to 0.
-  number: ${{ env.get("GITHUB_RUN_NUMBER", default="0") | int }}
+  # Every CI run publishes a fresh build from GITHUB_RUN_NUMBER. That counter
+  # restarted at 1 when packaging moved to the Package workflow, so offset it past
+  # the builds already on the channel (up to 17). Local builds fall back to 0.
+  number: ${{ (env.get("GITHUB_RUN_NUMBER", default="-100") | int) + 100 }}
   script: build.sh
 
 requirements:
@@ -44,6 +45,8 @@ tests:
       files:
         - share/applications/${{ app_id }}.desktop
         - share/icons/hicolor/scalable/apps/${{ app_id }}.svg
+        - Menu/pixibrowse.json
+        - Menu/pixibrowse.png
 
 about:
   summary: Desktop browser for conda channels, built on flatkit
