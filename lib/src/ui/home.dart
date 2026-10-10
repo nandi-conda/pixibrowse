@@ -75,7 +75,7 @@ class _HomePageState extends State<HomePage> {
     if (channels != null && channels.isNotEmpty) {
       _packageSearch.clear();
       state.packageQuery = '';
-      await state.loadChannels(channels);
+      await state.setChannels(channels);
     }
   }
 

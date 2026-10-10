@@ -70,6 +70,12 @@ The cache lives in `~/.cache/pixibrowse` (`$XDG_CACHE_HOME/pixibrowse`,
 Windows), or `$PIXIBROWSE_CACHE_DIR`. The web app relies on the browser's
 HTTP cache instead.
 
+Channels picked with `c` are remembered for the next start, in
+`~/.config/pixibrowse/channels.json` (`$XDG_CONFIG_HOME/pixibrowse`,
+`~/Library/Application Support/pixibrowse` on macOS, `%APPDATA%\pixibrowse`
+on Windows, or `$PIXIBROWSE_CONFIG_DIR`), and in `localStorage` on the web.
+Channels given with `-c` are used for that run without replacing them.
+
 Build the web app with its rendering engine bundled, rather than loaded from
 Google's CDN:
 

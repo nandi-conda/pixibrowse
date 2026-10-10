@@ -8,6 +8,7 @@ import 'conda/models.dart';
 import 'conda/prefix.dart';
 import 'conda/repodata.dart';
 import 'search.dart';
+import 'settings/channel_store.dart';
 
 enum Pane { packages, versions, details }
 
@@ -37,11 +38,18 @@ class BrowserState extends ChangeNotifier {
     RepodataClient? client,
     List<String>? channels,
     List<String>? platforms,
+    this.channelStore,
   })  : client = client ?? RepodataClient(),
-        channels = normalizeChannels(channels ?? const [defaultChannel]),
-        _requestedPlatforms = platforms;
+        channels = normalizeChannels(
+            channels ?? channelStore?.load() ?? const [defaultChannel]),
+        _requestedPlatforms = platforms {
+    if (this.channels.isEmpty) this.channels = [defaultChannel];
+  }
 
   final RepodataClient client;
+
+  /// Where the user's channel choice is kept between runs, if anywhere.
+  final ChannelStore? channelStore;
   List<String> channels;
   List<String>? _requestedPlatforms;
 
@@ -104,6 +112,14 @@ class BrowserState extends ChangeNotifier {
   int get totalPackages => _allPackages.length;
 
   Future<void> start() => loadChannels(channels);
+
+  /// Switches to the channels the user chose and remembers them for the
+  /// next run.
+  Future<void> setChannels(List<String> newChannels) {
+    final normalized = normalizeChannels(newChannels);
+    if (normalized.isNotEmpty) channelStore?.save(normalized);
+    return loadChannels(normalized);
+  }
 
   Future<void> loadChannels(List<String> newChannels) async {
     final generation = ++_generation;

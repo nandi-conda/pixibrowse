@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 
 import 'src/conda/cache/cache.dart';
 import 'src/conda/repodata.dart';
+import 'src/settings/channel_store.dart';
 import 'src/state.dart';
 import 'src/ui/home.dart';
 
 /// Desktop builds accept the TUI's startup flags:
-/// `-c/--channel` (repeatable) and `-p/--platform` (repeatable).
+/// `-c/--channel` (repeatable) and `-p/--platform` (repeatable). Channels
+/// given with `-c` win over the saved ones for that run.
 void main(List<String> args) {
   final options = parseArgs(args);
   runApp(PixiBrowseApp(
@@ -15,6 +17,7 @@ void main(List<String> args) {
       client: RepodataClient(cache: ByteCache.disk()),
       channels: options.channels.isEmpty ? null : options.channels,
       platforms: options.platforms.isEmpty ? null : options.platforms,
+      channelStore: ChannelStore.platformDefault(),
     ),
   ));
 }
