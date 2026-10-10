@@ -335,8 +335,10 @@ class _Toolbar extends StatelessWidget {
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 260),
             child: KitButton.ghost(
+              // The packages pane's checkbox already says when every
+              // channel is being searched, so this only names the picker.
               state.searchAllChannels
-                  ? 'All channels'
+                  ? 'Channels'
                   : state.channels.join(', '),
               icon: Icons.hub_outlined,
               tooltip: 'Channels  ( c )',
