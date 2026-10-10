@@ -110,6 +110,7 @@ class SearchField extends StatelessWidget {
                   onPressed: () {
                     controller.clear();
                     onChanged('');
+                    focusNode.requestFocus();
                   },
                 ),
         ),
