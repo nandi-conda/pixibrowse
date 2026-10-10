@@ -12,14 +12,18 @@ import 'src/ui/home.dart';
 /// given with `-c` win over the saved ones for that run.
 void main(List<String> args) {
   final options = parseArgs(args);
-  runApp(PixiBrowseApp(
-    state: BrowserState(
-      client: RepodataClient(cache: ByteCache.disk()),
-      channels: options.channels.isEmpty ? null : options.channels,
-      platforms: options.platforms.isEmpty ? null : options.platforms,
-      channelStore: ChannelStore.platformDefault(),
+  runApp(
+    PixiBrowseApp(
+      state: BrowserState(
+        client: RepodataClient(cache: ByteCache.disk()),
+        channels: options.channels.isEmpty ? null : options.channels,
+        platforms: options.platforms.isEmpty ? null : options.platforms,
+        channelStore: ChannelStore.platformDefault(),
+        // Without -c, start by searching every channel, like prefix.dev.
+        searchAllChannels: options.channels.isEmpty,
+      ),
     ),
-  ));
+  );
 }
 
 ({List<String> channels, List<String> platforms}) parseArgs(List<String> args) {

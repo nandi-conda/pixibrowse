@@ -347,8 +347,10 @@ class PackageInfoView extends StatelessWidget {
     ];
     // The channels this package came from, so the note blames the right one.
     final sources = records.isEmpty
-        ? state.channels
-        : [for (final c in {for (final r in records) r.channel}) c];
+        ? state.packageChannels
+        : [
+            for (final c in {for (final r in records) r.channel}) c,
+          ];
     final served = sources.where(state.channelsWithChannelData.contains);
     const fallback = 'showing the newest artifact\'s record.';
     final String? note;
@@ -359,11 +361,13 @@ class PackageInfoView extends StatelessWidget {
     } else if (state.loadingChannelData) {
       note = 'Loading the summary from channeldata.json…';
     } else if (state.prefixDevError != null) {
-      note = 'Could not look up $name on prefix.dev '
+      note =
+          'Could not look up $name on prefix.dev '
           '(${state.prefixDevError}); $fallback';
     } else if (served.isEmpty) {
       final onPrefixDev = sources.any((c) => prefixDevChannelName(c) != null);
-      note = '${sources.join(', ')} '
+      note =
+          '${sources.join(', ')} '
           '${sources.length == 1 ? 'serves' : 'serve'} no channeldata.json'
           '${onPrefixDev ? ' and prefix.dev has no summary for $name' : ''}'
           '; $fallback';

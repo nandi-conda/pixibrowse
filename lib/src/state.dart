@@ -19,9 +19,7 @@ enum DetailSection { metadata, dependencies, about, patches, files }
 /// artifact.
 class VersionRow {
   const VersionRow.section(this.subdir, this.count) : record = null;
-  const VersionRow.entry(PackageRecord this.record)
-      : subdir = null,
-        count = 0;
+  const VersionRow.entry(PackageRecord this.record) : subdir = null, count = 0;
 
   final String? subdir;
   final int count;
@@ -39,10 +37,12 @@ class BrowserState extends ChangeNotifier {
     List<String>? channels,
     List<String>? platforms,
     this.channelStore,
-  })  : client = client ?? RepodataClient(),
-        channels = normalizeChannels(
-            channels ?? channelStore?.load() ?? const [defaultChannel]),
-        _requestedPlatforms = platforms {
+    this.searchAllChannels = false,
+  }) : client = client ?? RepodataClient(),
+       channels = normalizeChannels(
+         channels ?? channelStore?.load() ?? const [defaultChannel],
+       ),
+       _requestedPlatforms = platforms {
     if (this.channels.isEmpty) this.channels = [defaultChannel];
   }
 
@@ -50,6 +50,33 @@ class BrowserState extends ChangeNotifier {
 
   /// Where the user's channel choice is kept between runs, if anywhere.
   final ChannelStore? channelStore;
+
+  /// Whether the package list searches every channel on prefix.dev instead
+  /// of listing the chosen channels.
+  bool searchAllChannels;
+
+  /// What searching every channel found for [packageQuery], most similar
+  /// first, and how many matched in all.
+  List<PrefixDevHit> hits = const [];
+  int hitTotal = 0;
+  bool searchingAll = false;
+  String? searchAllError;
+  Map<String, PrefixDevHit> _hitsByKey = const {};
+  int _searchGeneration = 0;
+  Timer? _searchTimer;
+
+  /// How long typing has to pause before prefix.dev is asked.
+  Duration searchDelay = const Duration(milliseconds: 250);
+
+  /// The search hit whose package is open, when it came from one.
+  PrefixDevHit? openHit;
+
+  /// The hit listed under [key] in the package list.
+  PrefixDevHit? hitFor(String key) => _hitsByKey[key];
+
+  /// The channels the open package is read from.
+  List<String> get packageChannels =>
+      openHit == null ? channels : [openHit!.channelUrl];
   List<String> channels;
   List<String>? _requestedPlatforms;
 
@@ -90,6 +117,9 @@ class BrowserState extends ChangeNotifier {
   int packageIndex = 0;
 
   String? selectedPackage;
+
+  /// What [selectedPackage] is listed under in [packages].
+  String? selectedKey;
   List<PackageRecord> records = const [];
   bool loadingRecords = false;
   String? recordsError;
@@ -99,6 +129,7 @@ class BrowserState extends ChangeNotifier {
   int versionIndex = 0;
 
   PackageRecord? selectedRecord;
+
   /// Sections the user folded away; kept while moving between artifacts.
   final Set<DetailSection> collapsedSections = {};
   ArtifactContents? contents;
@@ -111,13 +142,36 @@ class BrowserState extends ChangeNotifier {
 
   int get totalPackages => _allPackages.length;
 
-  Future<void> start() => loadChannels(channels);
+  Future<void> start() async {
+    if (searchAllChannels) {
+      _applyPackageFilter();
+      notifyListeners();
+      return;
+    }
+    await loadChannels(channels);
+  }
+
+  /// Switches between searching every channel on prefix.dev and listing the
+  /// chosen channels, loading those the first time they are needed.
+  Future<void> setSearchAllChannels(bool value) async {
+    if (value == searchAllChannels) return;
+    searchAllChannels = value;
+    _clearPackage();
+    focusedPane = Pane.packages;
+    _applyPackageFilter();
+    notifyListeners();
+    if (!value && totalPackages == 0 && !loadingChannels) {
+      await loadChannels(channels);
+    }
+  }
 
   /// Switches to the channels the user chose and remembers them for the
   /// next run.
   Future<void> setChannels(List<String> newChannels) {
     final normalized = normalizeChannels(newChannels);
     if (normalized.isNotEmpty) channelStore?.save(normalized);
+    // Picking channels means browsing them.
+    searchAllChannels = false;
     return loadChannels(normalized);
   }
 
@@ -219,24 +273,27 @@ class BrowserState extends ChangeNotifier {
     channelsWithChannelData = served;
     channelDataError = errors.isEmpty ? null : errors.join('\n');
     loadingChannelData = false;
-    if (packageQuery.trim().isNotEmpty) _applyPackageFilter(keepSelection: true);
+    if (packageQuery.trim().isNotEmpty) {
+      _applyPackageFilter(keepSelection: true);
+    }
     notifyListeners();
   }
 
   /// What the channel says about [name], from its channeldata or, on
   /// prefix.dev, its GraphQL API.
-  ChannelPackage? infoFor(String name) =>
-      channelInfo[name] ?? _prefixDevInfo[name];
+  ChannelPackage? infoFor(String name) => openHit != null
+      ? _prefixDevInfo[name]
+      : channelInfo[name] ?? _prefixDevInfo[name];
 
   /// Asks prefix.dev about [name] when a channel is hosted there and no
   /// channeldata has an entry for it, trying channels in order.
   Future<void> _lookUpPrefixDev(String name) async {
     final hosted = [
-      for (final channel in channels)
+      for (final channel in packageChannels)
         if (prefixDevChannelName(channel) != null) channel,
     ];
     if (hosted.isEmpty ||
-        channelInfo.containsKey(name) ||
+        (openHit == null && channelInfo.containsKey(name)) ||
         _prefixDevInfo.containsKey(name) ||
         !_prefixDevLookups.add(name)) {
       return;
@@ -265,8 +322,13 @@ class BrowserState extends ChangeNotifier {
 
   /// Downloads everything again, ignoring what is cached, and keeps the
   /// current platform selection.
-  Future<void> refresh() {
+  Future<void> refresh() async {
     client.refresh();
+    if (searchAllChannels) {
+      _scheduleSearch();
+      notifyListeners();
+      return;
+    }
     if (selectedPlatforms.isNotEmpty) _requestedPlatforms = selectedPlatforms;
     return loadChannels(channels);
   }
@@ -277,6 +339,50 @@ class BrowserState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Asks prefix.dev for [packageQuery] once typing pauses.
+  void _scheduleSearch() {
+    _searchTimer?.cancel();
+    final generation = ++_searchGeneration;
+    final query = packageQuery.trim();
+    if (query.isEmpty) {
+      searchingAll = false;
+      searchAllError = null;
+      _setHits(const [], 0);
+      return;
+    }
+    searchingAll = true;
+    _searchTimer = Timer(searchDelay, () async {
+      try {
+        final result = await searchPrefixDev(client.client, query);
+        if (generation != _searchGeneration) return;
+        searchAllError = null;
+        _setHits(result.hits, result.total);
+      } catch (e) {
+        if (generation != _searchGeneration) return;
+        searchAllError = '$e';
+        _setHits(const [], 0);
+      } finally {
+        if (generation == _searchGeneration) {
+          searchingAll = false;
+          notifyListeners();
+        }
+      }
+    });
+  }
+
+  void _setHits(List<PrefixDevHit> found, int total) {
+    final current = packageIndex < packages.length
+        ? packages[packageIndex]
+        : null;
+    hits = found;
+    hitTotal = total;
+    _hitsByKey = {for (final hit in found) hit.key: hit};
+    packages = [for (final hit in found) hit.key];
+    packageMatches = const {};
+    final keep = current == null ? -1 : packages.indexOf(current);
+    packageIndex = keep < 0 ? 0 : keep;
+  }
+
   void setSearchSummaries(bool value) {
     searchSummaries = value;
     _applyPackageFilter();
@@ -284,6 +390,10 @@ class BrowserState extends ChangeNotifier {
   }
 
   void _applyPackageFilter({bool keepSelection = false}) {
+    if (searchAllChannels) {
+      _scheduleSearch();
+      return;
+    }
     final current = keepSelection && packageIndex < packages.length
         ? packages[packageIndex]
         : null;
@@ -338,6 +448,8 @@ class BrowserState extends ChangeNotifier {
 
   void _clearPackage() {
     selectedPackage = null;
+    selectedKey = null;
+    openHit = null;
     records = const [];
     versionRows = const [];
     recordsError = null;
@@ -352,10 +464,17 @@ class BrowserState extends ChangeNotifier {
     loadingContents = false;
   }
 
-  Future<void> openPackage(String name) async {
+  /// Opens the package listed under [key]: its name, or a search hit's key.
+  Future<void> openPackage(String key) async {
     final generation = _generation;
-    if (packages.contains(name)) packageIndex = packages.indexOf(name);
+    final hit = searchAllChannels ? _hitsByKey[key] : null;
+    final name = hit?.name ?? key;
+    if (packages.contains(key)) packageIndex = packages.indexOf(key);
     selectedPackage = name;
+    selectedKey = key;
+    openHit = hit;
+    // A name can mean different packages on different channels.
+    if (hit != null) _prefixDevInfo.remove(name);
     records = const [];
     versionRows = const [];
     versionQuery = '';
@@ -367,16 +486,19 @@ class BrowserState extends ChangeNotifier {
     notifyListeners();
     unawaited(_lookUpPrefixDev(name));
     try {
-      final result =
-          await client.records(name, channels, selectedPlatforms);
-      if (generation != _generation || selectedPackage != name) return;
+      final result = await client.records(
+        name,
+        packageChannels,
+        hit == null ? selectedPlatforms : hit.platforms,
+      );
+      if (generation != _generation || selectedKey != key) return;
       records = result;
       _buildVersionRows();
       versionIndex = versionRows.length > 1 ? 1 : 0;
     } catch (e) {
-      if (selectedPackage == name) recordsError = '$e';
+      if (selectedKey == key) recordsError = '$e';
     } finally {
-      if (selectedPackage == name) {
+      if (selectedKey == key) {
         loadingRecords = false;
         notifyListeners();
       }
@@ -392,12 +514,14 @@ class BrowserState extends ChangeNotifier {
 
   void toggleSubdir(String subdir) {
     if (!collapsedSubdirs.remove(subdir)) collapsedSubdirs.add(subdir);
-    final current =
-        versionIndex < versionRows.length ? versionRows[versionIndex] : null;
+    final current = versionIndex < versionRows.length
+        ? versionRows[versionIndex]
+        : null;
     _buildVersionRows();
     if (current != null) {
-      final index = versionRows.indexWhere((row) =>
-          row.subdir == current.subdir && row.record == current.record);
+      final index = versionRows.indexWhere(
+        (row) => row.subdir == current.subdir && row.record == current.record,
+      );
       versionIndex = index < 0 ? 0 : index;
     }
     notifyListeners();
@@ -419,8 +543,9 @@ class BrowserState extends ChangeNotifier {
     }
     final subdirs = bySubdir.keys.toList()
       ..sort((a, b) {
-        final c = bySubdir[b]!.first.parsedVersion
-            .compareTo(bySubdir[a]!.first.parsedVersion);
+        final c = bySubdir[b]!.first.parsedVersion.compareTo(
+          bySubdir[a]!.first.parsedVersion,
+        );
         return c != 0 ? c : a.compareTo(b);
       });
     versionRows = [
@@ -499,6 +624,7 @@ class BrowserState extends ChangeNotifier {
 
   @override
   void dispose() {
+    _searchTimer?.cancel();
     client.dispose();
     super.dispose();
   }

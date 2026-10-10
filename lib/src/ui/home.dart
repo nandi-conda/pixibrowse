@@ -214,6 +214,8 @@ class _HomePageState extends State<HomePage> {
       _refresh();
     } else if (char == 's') {
       state.setSearchSummaries(!state.searchSummaries);
+    } else if (char == 'a') {
+      state.setSearchAllChannels(!state.searchAllChannels);
     } else if (char != null &&
         state.selectedRecord != null &&
         RegExp(r'^[1-5]$').hasMatch(char)) {
@@ -227,7 +229,8 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final c = KitTheme.of(context);
-    final busy = state.loadingChannels ||
+    final busy =
+        state.loadingChannels ||
         state.loadingRecords ||
         state.loadingContents ||
         state.loadingChannelData;
@@ -244,9 +247,8 @@ class _HomePageState extends State<HomePage> {
         SizedBox(height: 2, child: busy ? ColoredBox(color: c.accent) : null),
         Expanded(
           child: LayoutBuilder(
-            builder: (context, constraints) => constraints.maxWidth >= 1000
-                ? _wideLayout()
-                : _narrowLayout(),
+            builder: (context, constraints) =>
+                constraints.maxWidth >= 1000 ? _wideLayout() : _narrowLayout(),
           ),
         ),
         _StatusBar(state: state),
@@ -255,17 +257,17 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _packagesPane() => PackagesPane(
-        state: state,
-        searchController: _packageSearch,
-        searchFocus: _packageSearchFocus,
-      );
+    state: state,
+    searchController: _packageSearch,
+    searchFocus: _packageSearchFocus,
+  );
 
   Widget _versionsPane({bool showBack = false}) => VersionsPane(
-        state: state,
-        searchController: _versionSearch,
-        searchFocus: _versionSearchFocus,
-        showBack: showBack,
-      );
+    state: state,
+    searchController: _versionSearch,
+    searchFocus: _versionSearchFocus,
+    showBack: showBack,
+  );
 
   Widget _wideLayout() {
     return Row(
@@ -325,12 +327,17 @@ class _Toolbar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Text('pixibrowse', style: mono(context, size: 16, weight: FontWeight.bold)),
+          Text(
+            'pixibrowse',
+            style: mono(context, size: 16, weight: FontWeight.bold),
+          ),
           const Spacer(),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 260),
             child: KitButton.ghost(
-              state.channels.join(', '),
+              state.searchAllChannels
+                  ? 'All channels'
+                  : state.channels.join(', '),
               icon: Icons.hub_outlined,
               tooltip: 'Channels  ( c )',
               onPressed: onChannels,
@@ -373,15 +380,20 @@ class _StatusBar extends StatelessWidget {
     final summaries = state.loadingChannelData
         ? ' · loading summaries…'
         : state.channelInfo.isEmpty
-            ? ''
-            : ' · ${state.channelInfo.length} summaries';
-    final text = state.status ??
-        (state.error != null
-            ? 'Error'
-            : '${state.totalPackages} packages · '
-                '${state.selectedPlatforms.length} platform'
-                '${state.selectedPlatforms.length == 1 ? '' : 's'} · '
-                '${state.channels.join(', ')}$summaries');
+        ? ''
+        : ' · ${state.channelInfo.length} summaries';
+    final hit = state.openHit;
+    final text = state.searchAllChannels
+        ? hit != null
+              ? '${hit.name} on ${hit.channelName} · searching all channels on prefix.dev'
+              : 'Searching all channels on prefix.dev'
+        : state.status ??
+              (state.error != null
+                  ? 'Error'
+                  : '${state.totalPackages} packages · '
+                        '${state.selectedPlatforms.length} platform'
+                        '${state.selectedPlatforms.length == 1 ? '' : 's'} · '
+                        '${state.channels.join(', ')}$summaries');
     return Container(
       height: 26,
       padding: const EdgeInsets.symmetric(horizontal: 12),

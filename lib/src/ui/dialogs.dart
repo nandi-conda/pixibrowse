@@ -192,6 +192,7 @@ const List<(String, String)> keybindings = [
   ('Esc', 'Back, or leave the search field'),
   ('/', 'Search packages or versions'),
   ('s', 'Toggle searching summaries'),
+  ('a', 'Toggle searching all channels on prefix.dev'),
   ('c', 'Select channels'),
   ('p', 'Select platforms'),
   ('r', 'Refresh channel data, skipping the cache'),
@@ -207,8 +208,11 @@ void showHelpDialog(BuildContext context) {
     (context) => KitDialog(
       title: 'Keyboard shortcuts',
       actions: [
-        KitButton('Close',
-            autofocus: true, onPressed: () => Navigator.of(context).pop()),
+        KitButton(
+          'Close',
+          autofocus: true,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ],
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -220,8 +224,10 @@ void showHelpDialog(BuildContext context) {
                 children: [
                   SizedBox(
                     width: 100,
-                    child: Text(key,
-                        style: mono(context, weight: FontWeight.bold)),
+                    child: Text(
+                      key,
+                      style: mono(context, weight: FontWeight.bold),
+                    ),
                   ),
                   Expanded(child: Text(action)),
                 ],
@@ -255,8 +261,11 @@ void showInfoFileDialog(BuildContext context, String path, Uint8List bytes) {
       title: path,
       width: 880,
       actions: [
-        KitButton('Close',
-            autofocus: true, onPressed: () => Navigator.of(context).pop()),
+        KitButton(
+          'Close',
+          autofocus: true,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ],
       content: SelectableText(text, style: mono(context, size: 12)),
     ),

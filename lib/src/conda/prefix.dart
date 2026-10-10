@@ -126,3 +126,108 @@ class PrefixDevException implements Exception {
   @override
   String toString() => 'prefix.dev: $message';
 }
+
+const String _searchQuery = r'''
+query Search($query: String!, $limit: Int!) {
+  packages(
+    filters: { name: { contains: $query } }
+    orderBy: { bySimilarity: { field: NAME, matches: $query, direction: DESC } }
+    limit: $limit
+  ) {
+    totalCount
+    page {
+      name
+      summary
+      platforms
+      channel { name baseUrl }
+    }
+  }
+}''';
+
+/// One package found by searching every channel on prefix.dev.
+class PrefixDevHit {
+  const PrefixDevHit({
+    required this.name,
+    required this.channelName,
+    required this.channelUrl,
+    this.summary,
+    this.platforms = const [],
+  });
+
+  final String name;
+  final String channelName;
+
+  /// Where the channel's repodata lives, such as
+  /// `https://prefix.dev/conda-forge`.
+  final String channelUrl;
+  final String? summary;
+  final List<String> platforms;
+
+  /// Tells apart packages of the same name on different channels.
+  String get key => '$channelName/$name';
+}
+
+/// Searches package names across every public channel prefix.dev knows,
+/// most similar first (larger channels win ties).
+Future<({List<PrefixDevHit> hits, int total})> searchPrefixDev(
+  http.Client client,
+  String query, {
+  int limit = 50,
+}) async {
+  final response = await client.post(
+    Uri.parse(prefixDevGraphqlUrl),
+    headers: {'Content-Type': 'application/json'},
+    body: jsonEncode({
+      'query': _searchQuery,
+      'variables': {'query': query, 'limit': limit},
+    }),
+  );
+  if (response.statusCode != 200) {
+    throw HttpStatusException(prefixDevGraphqlUrl, response.statusCode);
+  }
+  return parsePrefixDevSearch(
+    jsonDecode(utf8.decode(response.bodyBytes, allowMalformed: true)),
+  );
+}
+
+({List<PrefixDevHit> hits, int total}) parsePrefixDevSearch(Object? response) {
+  final data = response is Map ? response['data'] : null;
+  final packages = data is Map ? data['packages'] : null;
+  if (packages is! Map) {
+    final errors = response is Map ? response['errors'] : null;
+    if (errors is List && errors.isNotEmpty) {
+      final first = errors.first;
+      throw PrefixDevException(first is Map ? '${first['message']}' : '$first');
+    }
+    return (hits: const <PrefixDevHit>[], total: 0);
+  }
+  final hits = <PrefixDevHit>[];
+  final page = packages['page'];
+  for (final package in page is List ? page : const []) {
+    if (package is! Map || package['name'] is! String) continue;
+    final channel = package['channel'];
+    final channelName = channel is Map ? channel['name'] : null;
+    if (channelName is! String) continue;
+    final baseUrl = channel['baseUrl'];
+    final summary = package['summary'];
+    final platforms = package['platforms'];
+    hits.add(
+      PrefixDevHit(
+        name: package['name'] as String,
+        channelName: channelName,
+        channelUrl: baseUrl is String && baseUrl.isNotEmpty
+            ? baseUrl.replaceFirst(RegExp(r'/+$'), '')
+            : 'https://prefix.dev/$channelName',
+        summary: summary is String && summary.trim().isNotEmpty
+            ? summary.trim()
+            : null,
+        platforms: [
+          for (final p in platforms is List ? platforms : const [])
+            if (p is String) p,
+        ],
+      ),
+    );
+  }
+  final total = packages['totalCount'];
+  return (hits: hits, total: total is int ? total : hits.length);
+}

@@ -35,17 +35,18 @@ void main() {
     final store = MemoryChannelStore(['bioconda']);
     expect(BrowserState(channelStore: store).channels, ['bioconda']);
     // Channels given on the command line win for that run.
-    expect(
-      BrowserState(channels: ['pytorch'], channelStore: store).channels,
-      ['pytorch'],
-    );
+    expect(BrowserState(channels: ['pytorch'], channelStore: store).channels, [
+      'pytorch',
+    ]);
     expect(store.channels, ['bioconda']);
-    expect(BrowserState(channelStore: MemoryChannelStore()).channels,
-        ['conda-forge']);
+    expect(BrowserState(channelStore: MemoryChannelStore()).channels, [
+      'conda-forge',
+    ]);
 
     final state = BrowserState(
       client: RepodataClient(
-          client: MockClient((_) async => http.Response('', 404))),
+        client: MockClient((_) async => http.Response('', 404)),
+      ),
       channelStore: store,
     );
     await state.setChannels([' conda-forge', 'nvidia', 'nvidia']);

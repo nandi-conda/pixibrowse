@@ -121,4 +121,49 @@ void main() {
     expect(sent['variables'], {'channel': 'nandi-testing', 'name': 'zumba'});
     expect(await fetchPrefixDevPackage(client, 'conda-forge', 'zumba'), isNull);
   });
+
+  test('reads search hits across channels', () {
+    final result = parsePrefixDevSearch({
+      'data': {
+        'packages': {
+          'totalCount': 2,
+          'page': [
+            {
+              'name': 'numpy',
+              'summary': ' Array computing ',
+              'platforms': ['linux-64', 'osx-arm64'],
+              'channel': {
+                'name': 'conda-forge',
+                'baseUrl': 'https://prefix.dev/conda-forge/',
+              },
+            },
+            {
+              'name': 'numpy',
+              'summary': '',
+              'platforms': null,
+              'channel': {'name': 'nandi-testing'},
+            },
+            {'name': 'broken'},
+          ],
+        },
+      },
+    });
+    expect(result.total, 2);
+    expect(result.hits.map((h) => h.key),
+        ['conda-forge/numpy', 'nandi-testing/numpy']);
+    final first = result.hits.first;
+    expect(first.channelUrl, 'https://prefix.dev/conda-forge');
+    expect(first.summary, 'Array computing');
+    expect(first.platforms, ['linux-64', 'osx-arm64']);
+    expect(result.hits.last.channelUrl, 'https://prefix.dev/nandi-testing');
+    expect(result.hits.last.summary, isNull);
+    expect(
+      () => parsePrefixDevSearch({
+        'errors': [
+          {'message': 'bad query'},
+        ],
+      }),
+      throwsA(isA<PrefixDevException>()),
+    );
+  });
 }

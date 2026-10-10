@@ -314,6 +314,76 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
   });
 
+  testWidgets('searches every channel on prefix.dev', (tester) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final channel = fakeChannel();
+    final queries = <Object?>[];
+    final state = BrowserState(
+      client: RepodataClient(
+        client: MockClient((request) async {
+          if (request.url.toString() != 'https://prefix.dev/api/graphql') {
+            return channel.get(request.url, headers: request.headers);
+          }
+          queries.add((jsonDecode(request.body) as Map)['variables']);
+          return http.Response(
+            jsonEncode({
+              'data': {
+                'packages': {
+                  'totalCount': 120,
+                  'page': [
+                    {
+                      'name': 'numpy',
+                      'summary': 'Array computing',
+                      'platforms': ['linux-64', 'noarch'],
+                      'channel': {'name': 'test-forge', 'baseUrl': '$base/'},
+                    },
+                  ],
+                },
+              },
+            }),
+            200,
+          );
+        }),
+      ),
+      channels: ['test-forge'],
+      searchAllChannels: true,
+    )..searchDelay = Duration.zero;
+    await tester.pumpWidget(PixiBrowseApp(state: state, followKde: false));
+    await tester.pump();
+    expect(find.text('Type to search every channel on prefix.dev.'),
+        findsOneWidget);
+    // Nothing is downloaded until there is something to search for.
+    expect(state.totalPackages, 0);
+
+    await tester.enterText(find.byType(TextField).first, 'nump');
+    await settle(tester, () => state.searchingAll);
+    expect(queries, [
+      {'query': 'nump', 'limit': 50},
+    ]);
+    expect(state.packages, ['test-forge/numpy']);
+    expect(find.text('1 of 120'), findsOneWidget);
+    expect(find.text('Array computing'), findsOneWidget);
+
+    await tester.tap(find.text('numpy').last);
+    await settle(tester, () => state.loadingRecords);
+    expect(state.selectedPackage, 'numpy');
+    expect(state.packageChannels, [base]);
+    expect(state.recordsError, isNull);
+    expect(find.text('▾ linux-64 (2)'), findsOneWidget);
+
+    // Turning it off browses the chosen channels.
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+    await tester.pump();
+    expect(state.searchAllChannels, isFalse);
+    await settle(
+        tester, () => state.loadingChannels || state.loadingChannelData);
+    expect(state.totalPackages, 4);
+    await tester.pump(const Duration(seconds: 3));
+  });
+
   test('parses the TUI startup flags', () {
     final options =
         parseArgs(['-c', 'conda-forge', '--channel=bioconda', '-p', 'linux-64']);

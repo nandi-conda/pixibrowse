@@ -13,6 +13,11 @@ Package summaries, summary search and the disk cache come from
 
 ## Features
 
+- **Search every channel** on prefix.dev at once, the way its website does,
+  with no channels to add first. Each hit names its channel, and opening one
+  reads that channel's repodata directly. This is the default unless `-c` is
+  given; `a` (or the *All channels* box) switches to browsing chosen
+  channels.
 - **Browse packages** from any conda channel (conda-forge, bioconda, a URL…),
   several channels at once.
 - **Package summaries** from the channel's `channeldata.json`, shown next to
@@ -70,11 +75,13 @@ The cache lives in `~/.cache/pixibrowse` (`$XDG_CACHE_HOME/pixibrowse`,
 Windows), or `$PIXIBROWSE_CACHE_DIR`. The web app relies on the browser's
 HTTP cache instead.
 
-Channels picked with `c` are remembered for the next start, in
+Searching all channels uses prefix.dev's public GraphQL API
+(`https://prefix.dev/api/graphql`), which needs no key. Picking channels
+with `c` switches to browsing them. Channels picked with `c` are remembered for the next start, in
 `~/.config/pixibrowse/channels.json` (`$XDG_CONFIG_HOME/pixibrowse`,
 `~/Library/Application Support/pixibrowse` on macOS, `%APPDATA%\pixibrowse`
 on Windows, or `$PIXIBROWSE_CONFIG_DIR`), and in `localStorage` on the web.
-Channels given with `-c` are used for that run without replacing them.
+Channels given with `-c` are browsed for that run without replacing them.
 
 Build the web app with its rendering engine bundled, rather than loaded from
 Google's CDN:

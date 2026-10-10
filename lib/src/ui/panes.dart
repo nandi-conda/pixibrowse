@@ -8,9 +8,9 @@ import 'theme.dart';
 
 /// Taps on a row hand the keyboard back to list navigation.
 VoidCallback _unfocusThen(VoidCallback action) => () {
-      FocusManager.instance.primaryFocus?.unfocus();
-      action();
-    };
+  FocusManager.instance.primaryFocus?.unfocus();
+  action();
+};
 
 class PaneHeader extends StatelessWidget {
   const PaneHeader({
@@ -184,10 +184,23 @@ class PackagesPane extends StatelessWidget {
   Widget build(BuildContext context) {
     final active = state.focusedPane == Pane.packages;
     final c = KitTheme.of(context);
+    final all = state.searchAllChannels;
     Widget body;
-    if (state.error != null) {
+    if (all && state.searchAllError != null) {
+      body = CenteredMessage(
+        'Searching prefix.dev failed: ${state.searchAllError}\n'
+        'Press c to browse a channel instead.',
+        error: true,
+      );
+    } else if (all && state.packageQuery.trim().isEmpty) {
+      body = const CenteredMessage(
+        'Type to search every channel on prefix.dev.',
+      );
+    } else if (all && state.searchingAll && state.packages.isEmpty) {
+      body = const CenteredMessage('Searching prefix.dev…');
+    } else if (!all && state.error != null) {
       body = CenteredMessage(state.error!, error: true);
-    } else if (state.loadingChannels && state.totalPackages == 0) {
+    } else if (!all && state.loadingChannels && state.totalPackages == 0) {
       body = CenteredMessage(state.status ?? 'Loading…');
     } else if (state.packages.isEmpty) {
       body = CenteredMessage(
@@ -200,17 +213,21 @@ class PackagesPane extends StatelessWidget {
         itemCount: state.packages.length,
         selectedIndex: state.packageIndex,
         itemBuilder: (context, index, selected) {
-          final name = state.packages[index];
-          final open = name == state.selectedPackage;
+          final key = state.packages[index];
+          final hit = all ? state.hitFor(key) : null;
+          final name = hit?.name ?? key;
+          final open = key == state.selectedKey;
           final strong = selected && active;
-          final summary = state.infoFor(name)?.summary;
-          final match = state.packageMatches[name];
+          final summary = hit != null
+              ? hit.summary
+              : state.infoFor(name)?.summary;
+          final match = state.packageMatches[key];
           return KitListRow(
             selected: selected,
             active: active,
             onTap: _unfocusThen(() {
               state.focusPane(Pane.packages);
-              state.openPackage(name);
+              state.openPackage(key);
             }),
             child: Row(
               children: [
@@ -231,6 +248,24 @@ class PackagesPane extends StatelessWidget {
                   ),
                 ),
                 if (match != null) _MatchBadge(match, strong: strong),
+                if (hit != null) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    flex: 0,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 140),
+                      child: Text(
+                        hit.channelName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: KitText.small(
+                          context,
+                          color: strong ? c.onAccent : c.accent,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(width: 10),
                 Expanded(
                   child: summary == null
@@ -239,13 +274,18 @@ class PackagesPane extends StatelessWidget {
                           summary,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: KitText.small(context,
-                              color: strong ? c.onAccent : c.textDim),
+                          style: KitText.small(
+                            context,
+                            color: strong ? c.onAccent : c.textDim,
+                          ),
                         ),
                 ),
                 if (open)
-                  Icon(Icons.chevron_right,
-                      size: 16, color: strong ? c.onAccent : c.accent),
+                  Icon(
+                    Icons.chevron_right,
+                    size: 16,
+                    color: strong ? c.onAccent : c.accent,
+                  ),
               ],
             ),
           );
@@ -253,19 +293,39 @@ class PackagesPane extends StatelessWidget {
       );
     }
     final showSummaryToggle =
-        state.channelInfo.isNotEmpty || state.loadingChannelData;
+        !all && (state.channelInfo.isNotEmpty || state.loadingChannelData);
+    final String? subtitle;
+    if (all) {
+      subtitle = state.packageQuery.trim().isEmpty
+          ? 'all channels'
+          : state.searchingAll
+          ? 'searching…'
+          : state.hitTotal > state.packages.length
+          ? '${state.packages.length} of ${state.hitTotal}'
+          : '${state.packages.length} found';
+    } else {
+      subtitle = state.totalPackages == 0
+          ? null
+          : state.packageQuery.isEmpty
+          ? '${state.totalPackages} packages'
+          : '${state.packages.length} of ${state.totalPackages}';
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         PaneHeader(
           title: 'Packages',
-          subtitle: state.totalPackages == 0
-              ? null
-              : state.packageQuery.isEmpty
-                  ? '${state.totalPackages} packages'
-                  : '${state.packages.length} of ${state.totalPackages}',
+          subtitle: subtitle,
           active: active,
           trailing: [
+            KitTooltip(
+              message: 'Search every channel on prefix.dev  ( a )',
+              child: KitCheckbox(
+                value: all,
+                label: 'All channels',
+                onChanged: state.setSearchAllChannels,
+              ),
+            ),
             if (showSummaryToggle)
               KitTooltip(
                 message: state.loadingChannelData
@@ -285,7 +345,7 @@ class PackagesPane extends StatelessWidget {
         SearchField(
           controller: searchController,
           focusNode: searchFocus,
-          hint: 'Search packages  ( / )',
+          hint: all ? 'Search all channels  ( / )' : 'Search packages  ( / )',
           onChanged: state.setPackageQuery,
           onSubmitted: () {
             if (state.packages.isNotEmpty) {
@@ -336,12 +396,16 @@ class VersionsPane extends StatelessWidget {
     } else if (state.loadingRecords) {
       body = const CenteredMessage('Loading versions…');
     } else if (state.versionRows.isEmpty) {
-      body = CenteredMessage(state.versionQuery.isEmpty
-          ? 'No artifacts on the selected platforms.'
-          : 'No artifact matches "${state.versionQuery}".');
+      body = CenteredMessage(
+        state.versionQuery.isEmpty
+            ? 'No artifacts on the selected platforms.'
+            : 'No artifact matches "${state.versionQuery}".',
+      );
     } else {
-      final versionWidth = state.records
-          .fold<int>(0, (w, r) => r.version.length > w ? r.version.length : w);
+      final versionWidth = state.records.fold<int>(
+        0,
+        (w, r) => r.version.length > w ? r.version.length : w,
+      );
       body = KitSelectionList(
         itemCount: state.versionRows.length,
         selectedIndex: state.versionIndex,
@@ -398,11 +462,13 @@ class VersionsPane extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (state.channels.length > 1)
+                if (state.packageChannels.length > 1)
                   Text(
                     record.channel,
-                    style: KitText.small(context,
-                        color: strong ? c.onAccent : c.textDim),
+                    style: KitText.small(
+                      context,
+                      color: strong ? c.onAccent : c.textDim,
+                    ),
                   ),
               ],
             ),
@@ -419,7 +485,7 @@ class VersionsPane extends StatelessWidget {
           subtitle: state.loadingRecords
               ? 'Loading…'
               : '${state.records.length} artifact${state.records.length == 1 ? '' : 's'}'
-                  '${summary == null ? '' : ' · $summary'}',
+                    '${summary == null ? '' : ' · $summary'}',
           active: active,
           leading: showBack
               ? KitIconButton(
