@@ -298,6 +298,20 @@ void main() {
     expect(find.text('Copied numpy as JSON'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3));
     expect(find.text('Copied numpy as JSON'), findsNothing);
+
+    // Install commands name the channel and copy with one click.
+    expect(
+      find.text('pixi workspace channel add test-forge && pixi add numpy'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byIcon(Icons.content_copy).last);
+    await tester.pump();
+    expect(copied, 'pixi global install -c test-forge numpy');
+    expect(
+      find.text('Copied pixi global install -c test-forge numpy'),
+      findsOneWidget,
+    );
+    await tester.pump(const Duration(seconds: 3));
   });
 
   testWidgets('refresh reloads the channel', (tester) async {

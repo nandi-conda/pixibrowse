@@ -13,6 +13,7 @@ import '../conda/repodata.dart';
 import '../search.dart';
 import '../state.dart';
 import 'dialogs.dart';
+import 'install.dart';
 import 'panes.dart';
 import 'theme.dart';
 
@@ -317,6 +318,17 @@ class PackageInfoView extends StatelessWidget {
       if (info?.licenseFamily != null)
         ('License family', text(info!.licenseFamily)),
       ('Channel', text(info?.channel ?? newest?.channel)),
+      (
+        'Install',
+        InstallCommands(
+          name,
+          channel: newest?.channel ??
+              info?.channel ??
+              (state.packageChannels.isEmpty
+                  ? null
+                  : state.packageChannels.first),
+        ),
+      ),
       if (platforms.isNotEmpty) ('Platforms', text(platforms)),
       if (versions.isNotEmpty)
         (
@@ -941,6 +953,14 @@ class _MetadataGrid extends StatelessWidget {
         ('.tar.bz2 size', formatBytes((raw['legacy_bz2_size'] as num).toInt())),
     ];
     final long = <(String, Widget)>[
+      (
+        'Install',
+        InstallCommands(
+          record.name,
+          channel: record.channel,
+          version: record.version,
+        ),
+      ),
       ('File', text(record.fileName)),
       ('URL', _Link(record.url, record.url)),
       if (raw['python_site_packages_path'] != null)
