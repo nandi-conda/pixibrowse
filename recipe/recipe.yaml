@@ -9,7 +9,9 @@ package:
   version: ${{ version }}
 
 build:
-  number: 1
+  # Every CI run publishes a fresh build: GitHub sets GITHUB_RUN_NUMBER, which is
+  # already past the hand-bumped build 1. Local builds fall back to 0.
+  number: ${{ env.get("GITHUB_RUN_NUMBER", default="0") | int }}
   script: build.sh
 
 requirements:
