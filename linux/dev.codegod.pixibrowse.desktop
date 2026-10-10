@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=pixibrowse
+GenericName=Package Browser
+Comment=Browse conda and pixi channel packages
+Exec=pixibrowse
+Icon=dev.codegod.pixibrowse
+Terminal=false
+Categories=Development;Utility;
+Keywords=conda;pixi;package;channel;
+StartupWMClass=dev.codegod.pixibrowse

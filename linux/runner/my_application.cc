@@ -54,6 +54,18 @@ static void my_application_activate(GApplication* application) {
 
   gtk_window_set_default_size(window, 1280, 720);
 
+  // X11 takes the icon from the window; Wayland matches APPLICATION_ID to the
+  // installed dev.codegod.pixibrowse.desktop entry instead.
+  g_autofree gchar* exe_path = g_file_read_link("/proc/self/exe", nullptr);
+  if (exe_path != nullptr) {
+    g_autofree gchar* exe_dir = g_path_get_dirname(exe_path);
+    g_autofree gchar* icon_path =
+        g_build_filename(exe_dir, "data", "pixibrowse.png", nullptr);
+    if (!gtk_window_set_icon_from_file(window, icon_path, nullptr)) {
+      gtk_window_set_icon_name(window, APPLICATION_ID);
+    }
+  }
+
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(
       project, self->dart_entrypoint_arguments);

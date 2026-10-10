@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <g id="tile">
+    <rect x="16" y="16" width="224" height="224" rx="36" fill="#3daee9"/>
+    <rect x="16" y="168" width="224" height="72" rx="36" fill="#2b9ad6"/>
+    <rect x="16" y="168" width="224" height="36" fill="#2b9ad6"/>
+  </g>
+  <!-- package -->
+  <g id="package">
+    <polygon points="116,48 180,82 116,116 52,82" fill="#fcfcfc"/>
+    <polygon points="52,82 116,116 116,192 52,158" fill="#dceefa"/>
+    <polygon points="116,116 180,82 180,158 116,192" fill="#b3dbf3"/>
+    <polygon points="78,68 90,62 154,96 142,102" fill="#1d6fa8"/>
+    <polygon points="142,102 154,96 154,166 142,173" fill="#185d8d"/>
+  </g>
+  <!-- lens -->
+  <g id="lens">
+    <line x1="194" y1="194" x2="218" y2="218" stroke="#232629" stroke-width="18" stroke-linecap="round"/>
+    <circle cx="168" cy="168" r="33" fill="#fcfcfc" fill-opacity="0.88" stroke="#232629" stroke-width="12"/>
+    <path d="M150 158 a20 20 0 0 1 14 -14" fill="none" stroke="#3daee9" stroke-width="6" stroke-linecap="round"/>
+  </g>
+</svg>

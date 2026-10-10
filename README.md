@@ -133,3 +133,11 @@ The tests decode a real conda-forge shard and `.conda` info section
 ## License
 
 BSD 3-Clause, like pixi-browse. See [LICENSE](LICENSE).
+
+## Icon
+
+The source icon is `assets/icon/pixibrowse.svg`; the web, macOS, Windows and Linux
+icons are rendered from it. On Linux the bundle sets its own window icon; for a
+launcher entry and the Wayland icon, install `linux/dev.codegod.pixibrowse.desktop`
+to `~/.local/share/applications/` and `linux/dev.codegod.pixibrowse.svg` to
+`~/.local/share/icons/hicolor/scalable/apps/`.
